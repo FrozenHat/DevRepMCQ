@@ -1,0 +1,35 @@
+# Dependencies
+game/node_modules/
+admin/node_modules/
+api/node_modules/
+
+# Build outputs
+game/dist/
+admin/dist/
+admin/build/
+
+# Environment files
+api/.env
+game/.env
+admin/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Vite cache
+game/.vite/
+admin/.vite/
+
+# Temp files left by tools
+nul
+tmpclaude-*

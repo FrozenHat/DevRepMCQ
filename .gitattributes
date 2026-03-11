@@ -1,0 +1,25 @@
+# Normalize line endings
+* text=auto
+
+# Force LF for code and configs
+*.js   text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+*.sql  text eol=lf
+*.env* text eol=lf
+.gitignore text eol=lf
+
+# Binary assets — no conversion
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.mp3  binary
+*.ogg  binary
+*.wav  binary
+*.ttf  binary
+*.woff binary
+*.woff2 binary

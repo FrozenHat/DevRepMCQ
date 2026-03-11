@@ -1,0 +1,34 @@
+{
+  "key": "hub",
+  "title": "Хаб",
+  "assets": {
+    "background": { "key": "hub_background", "path": "/assets/hub_background.png" },
+    "navmap":     { "key": "hub_navmap",     "path": "/assets/hub_navmap.png" },
+    "occluder":   { "key": "hub_occluder",   "path": "/assets/hub_occluder.png" }
+  },
+  "spawn": { "xRatio": 0.12, "yRatio": 0.90 },
+  "perspective": {
+    "topYRatio":    0.40,
+    "bottomYRatio": 0.92,
+    "minScale":     0.1,
+    "maxScale":     1.0,
+    "smooth":       0.9
+  },
+  "occluder": {
+    "xRatio": 0.388,
+    "yRatio": 0.905
+  },
+  "zones": [
+    {
+      "key":       "taxi",
+      "xRatio":    0.87,
+      "yRatio":    0.70,
+      "width":     280,
+      "height":    120,
+      "label":     "Такси",
+      "questSlug": "taxi-quest",
+      "debugColor": 16765286,
+      "showDebug":  true
+    }
+  ]
+}

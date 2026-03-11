@@ -1,0 +1,45 @@
+{
+  "id": "taxi-quest",
+  "version": 1,
+  "start_node": "node_question",
+  "nodes": {
+    "node_question": {
+      "type": "dialogue",
+      "speaker": "Таксист",
+      "text": "Куда едем, дорогой?",
+      "next": "node_choice"
+    },
+    "node_choice": {
+      "type": "choice",
+      "text": "Рассказчик выбирает:",
+      "options": [
+        { "label": "На Ромашку",          "next": "node_taxi_reply" },
+        { "label": "К Цветнику",          "next": "node_taxi_reply" },
+        { "label": "К Китайской беседке", "next": "node_taxi_reply" }
+      ]
+    },
+    "node_set_flag": {
+      "type": "flag",
+      "flag_key": "taxi_called",
+      "flag_value": true,
+      "next": "node_taxi_reply"
+    },
+    "node_taxi_reply": {
+      "type": "dialogue",
+      "speaker": "Таксист",
+      "text": "Без проблем! Садись, можно не пристегиваться — у меня брат в полиции работает!",
+      "next": "node_ride_choice"
+    },
+    "node_ride_choice": {
+      "type": "choice",
+      "text": "",
+      "options": [
+        { "label": "Поехали!", "next": "node_end" }
+      ]
+    },
+    "node_end": {
+      "type": "end",
+      "outcome": "completed"
+    }
+  }
+}
