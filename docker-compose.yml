@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: mycityquest-db
+    environment:
+      POSTGRES_DB: mycityquest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mycityquest
+
+  # API Server
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: mycityquest-api
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mycityquest
+      JWT_SECRET: dev-secret-key-change-this-in-production
+      JWT_ACCESS_EXPIRES: 15m
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api/src:/app/src
+    networks:
+      - mycityquest
+    command: npm run dev
+
+  # Admin Panel
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: mycityquest-admin
+    environment:
+      VITE_API_BASE: http://localhost:3000/api
+    ports:
+      - "5174:5174"
+    depends_on:
+      - api
+    volumes:
+      - ./admin/src:/app/src
+    networks:
+      - mycityquest
+    command: npm run dev
+
+  # Game Client
+  game:
+    build:
+      context: ./game
+      dockerfile: Dockerfile
+    container_name: mycityquest-game
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./game/src:/app/src
+    networks:
+      - mycityquest
+    command: npm run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  mycityquest:
+    driver: bridge

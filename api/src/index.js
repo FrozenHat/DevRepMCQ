@@ -17,7 +17,7 @@ const app = express();
 app.use(cors({
     origin: config.NODE_ENV === 'production'
         ? false          // Nginx handles CORS in production
-        : 'http://localhost:5173',
+        : ['http://localhost:5173', 'http://localhost:5174'],
     credentials: true,
 }));
 
