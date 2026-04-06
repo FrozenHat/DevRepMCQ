@@ -1,21 +1,24 @@
+import { useState, useEffect } from 'react';
+import * as charactersApi from '../api/charactersApi.js';
 import useQuestStore from '../store/questStore.js';
-
-const MOCK_CHARACTERS = [
-    { id: 'taxi_driver', name: 'Таксист' },
-    { id: 'narrator',    name: 'Рассказчик' },
-    { id: 'policeman',   name: 'Полицейский' },
-    { id: 'player',      name: 'Игрок' },
-];
 
 export default function DialogueEditor({ nodeId, lines = [] }) {
     const updateNodeData = useQuestStore(s => s.updateNodeData);
+    const [characters, setCharacters] = useState([]);
+
+    useEffect(() => {
+        charactersApi.listCharacters()
+            .then(list => setCharacters(list))
+            .catch(() => setCharacters([]));
+    }, []);
 
     function setLines(nextLines) {
         updateNodeData(nodeId, { lines: nextLines });
     }
 
     function addLine() {
-        setLines([...lines, { character_id: MOCK_CHARACTERS[0].id, text: '' }]);
+        const defaultChar = characters[0]?.id ?? '';
+        setLines([...lines, { character_id: defaultChar, text: '' }]);
     }
 
     function removeLine(index) {
@@ -74,7 +77,10 @@ export default function DialogueEditor({ nodeId, lines = [] }) {
                             value={line.character_id}
                             onChange={e => updateLine(i, { character_id: e.target.value })}
                         >
-                            {MOCK_CHARACTERS.map(c => (
+                            {characters.length === 0 && (
+                                <option value={line.character_id}>{line.character_id || '(нет персонажей)'}</option>
+                            )}
+                            {characters.map(c => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>

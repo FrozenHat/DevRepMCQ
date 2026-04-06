@@ -99,7 +99,11 @@ const NodeRegistry = {
             widget: 'fields',
             fields: [
                 { key: 'outcome',        label: 'Результат',     type: 'select',
-                  options: ['completed', 'abandoned', 'failed'] },
+                  options: [
+                      { value: 'completed', label: 'Завершён'  },
+                      { value: 'abandoned', label: 'Заброшен'  },
+                      { value: 'failed',    label: 'Провален'  },
+                  ] },
                 { key: 'message',        label: 'Финальное сообщение', type: 'textarea' },
                 { key: 'rewards.points', label: 'Бонусные очки', type: 'number' },
             ],
@@ -177,8 +181,8 @@ const NodeRegistry = {
 
     flag: {
         component: FlagNode,
-        label:     'Flag',
-        color:     '#6b7280',
+        label:     'Action',
+        color:     '#f97316',
         category:  'auto',
         handles: {
             targets:        [{ id: 'target', label: '' }],
@@ -186,18 +190,16 @@ const NodeRegistry = {
             dynamicSources: false,
         },
         defaultData: {
-            type:        'flag',
-            flag_key:    '',
-            flag_value:  true,
-            next:        null,
+            type:         'flag',
+            element_type: null,
+            element_id:   null,
+            element_name: null,
+            action:       null,
+            action_label: null,
+            params:       {},
+            next:         null,
         },
-        inspector: {
-            widget: 'fields',
-            fields: [
-                { key: 'flag_key',   label: 'Ключ флага', type: 'text' },
-                { key: 'flag_value', label: 'Значение',   type: 'checkbox' },
-            ],
-        },
+        inspector: { widget: 'action-editor' },
     },
 
     item_grant: {

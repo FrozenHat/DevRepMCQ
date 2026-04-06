@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import useAuthStore  from '../store/authStore.js';
 import * as questApi from '../api/questApi.js';
 
-export default function QuestListPage({ onSelectQuest }) {
+export default function QuestListPage({ onSelectQuest, hideLogout }) {
     const logout = useAuthStore(s => s.logout);
 
     const [quests,  setQuests]  = useState([]);
@@ -54,9 +54,11 @@ export default function QuestListPage({ onSelectQuest }) {
                     >
                         {creating ? 'Отмена' : '+ Новый квест'}
                     </button>
-                    <button className="ql-btn ql-btn--ghost" onClick={logout}>
-                        Выйти
-                    </button>
+                    {!hideLogout && (
+                        <button className="ql-btn ql-btn--ghost" onClick={logout}>
+                            Выйти
+                        </button>
+                    )}
                 </div>
             </header>
 

@@ -1,0 +1,407 @@
+/* ============================================================
+   Scene Editor — NavMesh polygon editor styles
+   ============================================================ */
+
+/* Page wrapper */
+.se-page {
+    display:        flex;
+    flex-direction: column;
+    width:          100%;
+    height:         100%;
+    overflow:       hidden;
+    background:     var(--color-bg);
+}
+
+/* ── Toolbar ─────────────────────────────────────────────── */
+.se-toolbar {
+    display:         flex;
+    align-items:     center;
+    gap:             12px;
+    padding:         0 16px;
+    height:          48px;
+    flex-shrink:     0;
+    background:      var(--color-surface);
+    border-bottom:   1px solid var(--color-border);
+}
+
+.se-toolbar__title {
+    flex:        1;
+    font-weight: 600;
+    font-size:   13px;
+    color:       var(--color-text);
+    letter-spacing: 0.02em;
+}
+
+.se-toolbar__actions {
+    display:    flex;
+    align-items: center;
+    gap:        8px;
+}
+
+/* Toolbar buttons */
+.se-btn {
+    display:       inline-flex;
+    align-items:   center;
+    gap:           6px;
+    padding:       5px 12px;
+    border-radius: var(--radius-md);
+    font-size:     12px;
+    font-weight:   500;
+    cursor:        pointer;
+    border:        1px solid transparent;
+    transition:    background var(--transition), border-color var(--transition), color var(--transition);
+    white-space:   nowrap;
+}
+
+.se-btn--ghost {
+    background:   transparent;
+    border-color: var(--color-border);
+    color:        var(--color-text-muted);
+}
+.se-btn--ghost:hover {
+    background:  var(--color-surface-2);
+    color:       var(--color-text);
+}
+
+.se-btn--secondary {
+    background:   var(--color-surface-2);
+    border-color: var(--color-border);
+    color:        var(--color-text);
+}
+.se-btn--secondary:hover {
+    border-color: var(--color-accent);
+    color:        var(--color-accent);
+}
+
+.se-btn--primary {
+    background:   var(--color-accent);
+    border-color: var(--color-accent);
+    color:        #000;
+}
+.se-btn--primary:hover {
+    filter: brightness(1.12);
+}
+
+/* ── Main layout ─────────────────────────────────────────── */
+.se-layout {
+    display:    flex;
+    flex:       1;
+    overflow:   hidden;
+}
+
+/* ── Canvas area ─────────────────────────────────────────── */
+.se-canvas-wrap {
+    flex:           1;
+    display:        flex;
+    flex-direction: column;
+    overflow:       auto;
+    padding:        16px;
+    gap:            8px;
+    background:     var(--color-bg);
+}
+
+.se-canvas {
+    display:    block;
+    max-width:  100%;
+    height:     auto;
+    border:     1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor:     crosshair;
+    transition: border-color var(--transition);
+}
+.se-canvas:hover {
+    border-color: var(--color-accent);
+}
+
+.se-hint {
+    font-size:  11px;
+    color:      var(--color-text-muted);
+    text-align: center;
+    padding:    4px 0;
+}
+.se-hint b {
+    color: var(--color-text);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.se-sidebar {
+    width:          260px;
+    flex-shrink:    0;
+    display:        flex;
+    flex-direction: column;
+    gap:            8px;
+    padding:        12px;
+    border-left:    1px solid var(--color-border);
+    background:     var(--color-surface);
+    overflow-y:     auto;
+}
+
+.se-sidebar__title {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+    font-size:   12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color:       var(--color-text-muted);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.se-badge {
+    background:    var(--color-surface-2);
+    border:        1px solid var(--color-border);
+    border-radius: 10px;
+    padding:       1px 7px;
+    font-size:     11px;
+    color:         var(--color-text);
+    font-weight:   600;
+}
+
+.se-drawing-hint {
+    font-size:     11px;
+    color:         var(--color-warning);
+    background:    color-mix(in srgb, var(--color-warning) 12%, transparent);
+    border:        1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+    border-radius: var(--radius-sm);
+    padding:       5px 8px;
+}
+
+.se-empty {
+    font-size:  12px;
+    color:      var(--color-text-muted);
+    text-align: center;
+    padding:    20px 0;
+    font-style: italic;
+}
+
+/* Polygon list */
+.se-poly-list {
+    display:        flex;
+    flex-direction: column;
+    gap:            4px;
+}
+
+.se-poly-item {
+    display:       flex;
+    align-items:   center;
+    gap:           8px;
+    padding:       6px 8px;
+    background:    var(--color-surface-2);
+    border:        1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size:     12px;
+}
+
+.se-poly-dot {
+    width:         10px;
+    height:        10px;
+    border-radius: 50%;
+    flex-shrink:   0;
+}
+
+.se-poly-name {
+    flex:       1;
+    color:      var(--color-text);
+    font-weight: 500;
+}
+
+.se-poly-count {
+    color:     var(--color-text-muted);
+    font-size: 11px;
+}
+
+.se-poly-del {
+    background:   transparent;
+    border:       none;
+    color:        var(--color-text-muted);
+    cursor:       pointer;
+    padding:      2px 4px;
+    border-radius: var(--radius-sm);
+    font-size:    11px;
+    line-height:  1;
+    transition:   color var(--transition), background var(--transition);
+}
+.se-poly-del:hover {
+    color:       var(--color-danger);
+    background:  color-mix(in srgb, var(--color-danger) 12%, transparent);
+}
+
+/* JSON preview */
+.se-preview {
+    margin-top:     4px;
+    border:         1px solid var(--color-border);
+    border-radius:  var(--radius-md);
+    overflow:       hidden;
+    flex-shrink:    0;
+}
+
+.se-preview__label {
+    padding:       5px 10px;
+    font-size:     10px;
+    font-weight:   600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color:         var(--color-text-muted);
+    background:    var(--color-surface-2);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.se-preview__code {
+    padding:     8px 10px;
+    font-family: var(--font-mono);
+    font-size:   10px;
+    line-height: 1.6;
+    color:       var(--color-text);
+    white-space: pre;
+    overflow-x:  auto;
+    max-height:  280px;
+    overflow-y:  auto;
+    background:  var(--color-bg);
+}
+
+/* ── Tool switcher ────────────────────────────────────────── */
+.se-tools {
+    display:       flex;
+    align-items:   center;
+    gap:           4px;
+    padding:       6px 16px;
+    background:    var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink:   0;
+}
+
+.se-tool-btn {
+    padding:       5px 14px;
+    border:        1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background:    transparent;
+    color:         var(--color-text-muted);
+    font-size:     12px;
+    font-weight:   500;
+    cursor:        pointer;
+    transition:    background var(--transition), color var(--transition), border-color var(--transition);
+}
+.se-tool-btn:hover { background: var(--color-surface-2); color: var(--color-text); }
+.se-tool-btn--active {
+    background:    var(--color-surface-2);
+    border-color:  var(--color-accent);
+    color:         var(--color-accent);
+    font-weight:   600;
+}
+
+/* ── Scene metadata ───────────────────────────────────────── */
+.se-meta {
+    display:        flex;
+    flex-direction: column;
+    gap:            4px;
+    padding-bottom: 10px;
+    border-bottom:  1px solid var(--color-border);
+}
+
+.se-meta__label {
+    font-size:   10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color:       var(--color-text-muted);
+    margin-top:  4px;
+}
+
+.se-meta__input,
+.se-meta__textarea {
+    background:    var(--color-surface-2);
+    border:        1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color:         var(--color-text);
+    font-size:     12px;
+    padding:       5px 8px;
+    width:         100%;
+    resize:        none;
+    font-family:   var(--font-body);
+    transition:    border-color var(--transition);
+}
+.se-meta__input:focus,
+.se-meta__textarea:focus {
+    outline:      none;
+    border-color: var(--color-accent);
+}
+
+/* ── Entity picker ────────────────────────────────────────── */
+.se-picker {
+    display:        flex;
+    flex-direction: column;
+    gap:            3px;
+    margin-top:     2px;
+}
+
+.se-picker-item {
+    display:       flex;
+    align-items:   center;
+    gap:           7px;
+    padding:       5px 8px;
+    border:        1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background:    var(--color-surface-2);
+    cursor:        pointer;
+    font-size:     12px;
+    transition:    border-color var(--transition), background var(--transition);
+}
+.se-picker-item:hover { border-color: var(--color-accent); }
+.se-picker-item--selected {
+    border-color: var(--color-accent);
+    background:   color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.se-picker-icon { font-size: 13px; flex-shrink: 0; }
+.se-picker-name { flex: 1; color: var(--color-text); font-weight: 500; }
+.se-picker-meta { font-size: 10px; color: var(--color-text-muted); }
+
+/* ── Placed marker items ──────────────────────────────────── */
+.se-marker-item {
+    display:       flex;
+    align-items:   center;
+    gap:           7px;
+    padding:       5px 8px;
+    border:        1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background:    var(--color-surface-2);
+    font-size:     12px;
+}
+
+.se-marker-dot {
+    width:         20px;
+    height:        20px;
+    border-radius: 50%;
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    color:         #000;
+    font-size:     10px;
+    font-weight:   700;
+    flex-shrink:   0;
+}
+
+.se-marker-label { flex: 1; color: var(--color-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.se-marker-pos   { font-size: 10px; color: var(--color-text-muted); font-family: var(--font-mono); flex-shrink: 0; }
+
+.se-marker-edit {
+    flex:           1;
+    display:        flex;
+    flex-direction: column;
+    gap:            2px;
+    min-width:      0;
+}
+
+.se-marker-label-input {
+    background:    var(--color-bg);
+    border:        1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color:         var(--color-text);
+    font-size:     11px;
+    padding:       3px 6px;
+    width:         100%;
+    font-family:   var(--font-body);
+    transition:    border-color var(--transition);
+}
+.se-marker-label-input:focus { outline: none; border-color: var(--color-accent); }

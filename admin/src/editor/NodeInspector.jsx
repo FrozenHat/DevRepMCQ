@@ -2,6 +2,7 @@ import useQuestStore  from '../store/questStore.js';
 import NodeRegistry   from '../nodes/NodeRegistry.js';
 import DialogueEditor from './DialogueEditor.jsx';
 import ChoiceEditor   from './ChoiceEditor.jsx';
+import ActionEditor   from './ActionEditor.jsx';
 
 // ---------------------------------------------------------------------------
 // Generic field renderer
@@ -27,7 +28,7 @@ function setPath(obj, path, value) {
 }
 
 function FieldEditor({ field, data, onChange }) {
-    const value = getPath(data, field.path) ?? field.default ?? '';
+    const value = getPath(data, field.key) ?? field.default ?? '';
 
     switch (field.type) {
         case 'text':
@@ -36,7 +37,7 @@ function FieldEditor({ field, data, onChange }) {
                     className="inspector-input"
                     type="text"
                     value={value}
-                    onChange={e => onChange(field.path, e.target.value)}
+                    onChange={e => onChange(field.key, e.target.value)}
                 />
             );
 
@@ -46,7 +47,7 @@ function FieldEditor({ field, data, onChange }) {
                     className="inspector-textarea"
                     rows={field.rows ?? 3}
                     value={value}
-                    onChange={e => onChange(field.path, e.target.value)}
+                    onChange={e => onChange(field.key, e.target.value)}
                 />
             );
 
@@ -56,7 +57,7 @@ function FieldEditor({ field, data, onChange }) {
                     className="inspector-input"
                     type="number"
                     value={value}
-                    onChange={e => onChange(field.path, Number(e.target.value))}
+                    onChange={e => onChange(field.key, Number(e.target.value))}
                 />
             );
 
@@ -65,7 +66,7 @@ function FieldEditor({ field, data, onChange }) {
                 <input
                     type="checkbox"
                     checked={!!value}
-                    onChange={e => onChange(field.path, e.target.checked)}
+                    onChange={e => onChange(field.key, e.target.checked)}
                 />
             );
 
@@ -74,11 +75,12 @@ function FieldEditor({ field, data, onChange }) {
                 <select
                     className="inspector-select"
                     value={value}
-                    onChange={e => onChange(field.path, e.target.value)}
+                    onChange={e => onChange(field.key, e.target.value)}
                 >
-                    {(field.options ?? []).map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                    {(field.options ?? []).map(opt => {
+                        const o = typeof opt === 'string' ? { value: opt, label: opt } : opt;
+                        return <option key={o.value} value={o.value}>{o.label}</option>;
+                    })}
                 </select>
             );
 
@@ -95,18 +97,18 @@ function FieldEditor({ field, data, onChange }) {
                                 onChange={e => {
                                     const next = [...arr];
                                     next[i] = e.target.value;
-                                    onChange(field.path, next);
+                                    onChange(field.key, next);
                                 }}
                             />
                             <button
                                 className="inspector-btn inspector-btn--danger"
-                                onClick={() => onChange(field.path, arr.filter((_, j) => j !== i))}
+                                onClick={() => onChange(field.key, arr.filter((_, j) => j !== i))}
                             >✕</button>
                         </div>
                     ))}
                     <button
                         className="inspector-btn"
-                        onClick={() => onChange(field.path, [...arr, ''])}
+                        onClick={() => onChange(field.key, [...arr, ''])}
                     >+ Добавить</button>
                 </div>
             );
@@ -167,7 +169,7 @@ export default function NodeInspector() {
 
             <div className="inspector__body">
                 {inspector.widget === 'fields' && inspector.fields.map(field => (
-                    <div key={field.path} className="inspector__field">
+                    <div key={field.key} className="inspector__field">
                         <label className="inspector__label">{field.label}</label>
                         <FieldEditor
                             field={field}
@@ -190,7 +192,7 @@ export default function NodeInspector() {
                         <div className="inspector__field">
                             <label className="inspector__label">Текст вопроса</label>
                             <FieldEditor
-                                field={{ path: 'text', type: 'textarea', rows: 3 }}
+                                field={{ key: 'text', type: 'textarea', rows: 3 }}
                                 data={node.data}
                                 onChange={handleFieldChange}
                             />
@@ -200,6 +202,13 @@ export default function NodeInspector() {
                             options={node.data.options ?? []}
                         />
                     </>
+                )}
+
+                {inspector.widget === 'action-editor' && (
+                    <ActionEditor
+                        nodeId={selectedNodeId}
+                        data={node.data}
+                    />
                 )}
             </div>
         </div>

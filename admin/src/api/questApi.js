@@ -1,9 +1,27 @@
 /**
  * questApi.js
  * Token-aware API client for quest management endpoints.
- * Reads the JWT from authStore on every call — no need to pass tokens manually.
+ * В режиме DEV (npm run dev) использует localStorage вместо реального API.
  */
 import useAuthStore from '../store/authStore.js';
+
+const DEV = import.meta.env.DEV;
+const DEV_KEY = 'mcq_dev_quests';
+
+// ---------------------------------------------------------------------------
+// localStorage mock (только для разработки без PostgreSQL)
+// ---------------------------------------------------------------------------
+
+function devLoad() {
+    return JSON.parse(localStorage.getItem(DEV_KEY) ?? '[]');
+}
+function devSave(quests) {
+    localStorage.setItem(DEV_KEY, JSON.stringify(quests));
+}
+
+// ---------------------------------------------------------------------------
+// Real API helpers
+// ---------------------------------------------------------------------------
 
 function headers() {
     const token = useAuthStore.getState().token;
@@ -25,14 +43,23 @@ async function handleResponse(res) {
     return res.json();
 }
 
-/** GET /api/quests  — список всех квестов (только для admin) */
+// ---------------------------------------------------------------------------
+// API functions
+// ---------------------------------------------------------------------------
+
 export async function listQuests() {
+    if (DEV) return devLoad();
     const res = await fetch('/api/quests', { headers: headers() });
     return handleResponse(res);
 }
 
-/** POST /api/quests  — создать новый квест */
 export async function createQuest(title, slug) {
+    if (DEV) {
+        const quests = devLoad();
+        const quest = { id: `dev_${Date.now()}`, title, slug, createdAt: new Date().toISOString() };
+        devSave([quest, ...quests]);
+        return quest;
+    }
     const res = await fetch('/api/quests', {
         method:  'POST',
         headers: headers(),
@@ -41,19 +68,23 @@ export async function createQuest(title, slug) {
     return handleResponse(res);
 }
 
-/** GET /api/quests/:id/versions */
 export async function getVersions(questId) {
+    if (DEV) {
+        const quest = devLoad().find(q => q.id === questId);
+        return quest?.versions ?? [];
+    }
     const res = await fetch(`/api/quests/${questId}/versions`, { headers: headers() });
     return handleResponse(res);
 }
 
-/**
- * PUT /api/quests/:id/draft
- * Сохраняет весь граф квеста как черновик.
- * @param {string} questId
- * @param {Object} questGraph  — десериализованный quest JSON
- */
 export async function saveDraft(questId, questGraph) {
+    if (DEV) {
+        const quests = devLoad();
+        const quest  = quests.find(q => q.id === questId);
+        const version = { id: `ver_${Date.now()}`, version_number: 1, status: 'draft', data: questGraph };
+        if (quest) { quest.versions = [version]; devSave(quests); }
+        return version;
+    }
     const res = await fetch(`/api/quests/${questId}/draft`, {
         method:  'PUT',
         headers: headers(),
@@ -62,8 +93,13 @@ export async function saveDraft(questId, questGraph) {
     return handleResponse(res);
 }
 
-/** POST /api/quests/:id/publish */
 export async function publishVersion(questId, versionId) {
+    if (DEV) {
+        const quests = devLoad();
+        const quest  = quests.find(q => q.id === questId);
+        if (quest?.versions?.[0]) { quest.versions[0].status = 'published'; devSave(quests); return quest.versions[0]; }
+        return { id: versionId, status: 'published' };
+    }
     const res = await fetch(`/api/quests/${questId}/publish`, {
         method:  'POST',
         headers: headers(),

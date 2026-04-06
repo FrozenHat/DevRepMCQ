@@ -5,6 +5,7 @@ import App from './App.jsx';
 import './styles/global.css';
 import './styles/editor.css';
 import './styles/nodes.css';
+import './styles/scene-editor.css';
 
 createRoot(document.getElementById('root')).render(
     <StrictMode>
