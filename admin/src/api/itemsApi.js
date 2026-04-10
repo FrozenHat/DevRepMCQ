@@ -5,7 +5,7 @@
  */
 import useAuthStore from '../store/authStore.js';
 
-const DEV     = import.meta.env.DEV;
+const DEV     = import.meta.env.DEV && !import.meta.env.VITE_USE_API;
 const DEV_KEY = 'mcq_dev_items';
 
 function devLoad() { return JSON.parse(localStorage.getItem(DEV_KEY) ?? '[]'); }

@@ -4,6 +4,7 @@
   "assets": {
     "background": { "key": "hub_background", "path": "/assets/hub_background.png" },
     "navmap":     { "key": "hub_navmap",     "path": "/assets/hub_navmap.png" },
+    "navmesh":    { "key": "hub_navmesh",    "path": "/assets/hub_navmesh.json" },
     "occluder":   { "key": "hub_occluder",   "path": "/assets/hub_occluder.png" }
   },
   "spawn": { "xRatio": 0.12, "yRatio": 0.90 },

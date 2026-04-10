@@ -71,6 +71,9 @@ export default class LocationScene extends Phaser.Scene {
         if (assets.navmap && !this.textures.exists(assets.navmap.key)) {
             this.load.image(assets.navmap.key, assets.navmap.path);
         }
+        if (assets.navmesh && !this.cache.json.has(assets.navmesh.key)) {
+            this.load.json(assets.navmesh.key, assets.navmesh.path);
+        }
         if (assets.occluder && !this.textures.exists(assets.occluder.key)) {
             this.load.image(assets.occluder.key, assets.occluder.path);
         }
@@ -119,10 +122,11 @@ export default class LocationScene extends Phaser.Scene {
         // ------------------------------------------------------------------
         // Navigation
         // ------------------------------------------------------------------
+        const navmeshData = cfg.assets.navmesh ? this.cache.json.get(cfg.assets.navmesh.key) : null;
         this.navigationSystem = new NavigationSystem(
             this,
             this.player,
-            cfg.assets.navmap.key
+            navmeshData || null
         );
 
         // ------------------------------------------------------------------

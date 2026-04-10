@@ -4,7 +4,8 @@ const TOKEN_KEY = 'mcq_admin_token';
 const ROLE_KEY  = 'mcq_admin_role';
 
 // DEV BYPASS — auto-login без API/БД в режиме npm run dev
-const DEV = import.meta.env.DEV;
+// Отключается автоматически если VITE_USE_API=true в admin/.env.local
+const DEV = import.meta.env.DEV && !import.meta.env.VITE_USE_API;
 
 const useAuthStore = create((set) => ({
     token:      DEV ? 'dev-token' : (localStorage.getItem(TOKEN_KEY) ?? null),

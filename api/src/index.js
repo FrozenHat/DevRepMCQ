@@ -2,11 +2,15 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
-import { config } from './config.js';
-import authRoutes from './routes/auth.js';
-import questRoutes from './routes/quests.js';
-import sceneRoutes from './routes/scenes.js';
-import playerRoutes from './routes/player.js';
+import { config }          from './config.js';
+import { db }              from './db/index.js';
+import { authenticate }    from './middleware/auth.js';
+import authRoutes          from './routes/auth.js';
+import questRoutes         from './routes/quests.js';
+import sceneRoutes         from './routes/scenes.js';
+import playerRoutes        from './routes/player.js';
+import characterRoutes     from './routes/characters.js';
+import itemRoutes          from './routes/items.js';
 
 const app = express();
 
@@ -16,7 +20,7 @@ const app = express();
 
 app.use(cors({
     origin: config.NODE_ENV === 'production'
-        ? false          // Nginx handles CORS in production
+        ? false
         : ['http://localhost:5173', 'http://localhost:5174'],
     credentials: true,
 }));
@@ -27,10 +31,26 @@ app.use(express.json());
 // Routes
 // ---------------------------------------------------------------------------
 
-app.use('/api/auth',   authRoutes);
-app.use('/api/quests', questRoutes);
-app.use('/api/scenes', sceneRoutes);
-app.use('/api/player', playerRoutes);
+app.use('/api/auth',       authRoutes);
+app.use('/api/quests',     questRoutes);
+app.use('/api/scenes',     sceneRoutes);
+app.use('/api/player',     playerRoutes);
+app.use('/api/characters', characterRoutes);
+app.use('/api/items',      itemRoutes);
+
+// ---------------------------------------------------------------------------
+// GET /api/locations
+// Returns all scenes formatted as [{id, name}] for use in the quest Action node.
+// ---------------------------------------------------------------------------
+
+app.get('/api/locations', authenticate, async (req, res, next) => {
+    try {
+        const { rows } = await db.query(
+            'SELECT key, title FROM scenes ORDER BY title ASC'
+        );
+        res.json(rows.map(r => ({ id: r.key, name: r.title })));
+    } catch (err) { next(err); }
+});
 
 // ---------------------------------------------------------------------------
 // Health check

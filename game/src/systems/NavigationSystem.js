@@ -1,106 +1,138 @@
+/**
+ * NavigationSystem
+ *
+ * Builds a walkable boolean grid from NavMesh polygon data (JSON),
+ * then uses A* to find paths and a line-of-sight string-pull to smooth them.
+ *
+ * The navmesh data format matches the export from the admin Scene Editor:
+ * {
+ *   scene:   { width: number, height: number },
+ *   navMesh: Array<Array<{ x: number, y: number }>>  // convex or concave polygons
+ * }
+ *
+ * Replaces the old PNG-alpha-channel approach.
+ */
 export default class NavigationSystem {
     /**
-     * @param {Phaser.Scene} scene
-     * @param {Player}       player
-     * @param {string}       navMapKey  Texture key of the navmesh image.
-     *                                  White pixels (r >= 128) are walkable.
+     * @param {Phaser.Scene}  scene
+     * @param {Player}        player
+     * @param {Object|null}   navmeshData  Parsed JSON from hub_navmesh.json
      */
-    constructor(scene, player, navMapKey = 'hub_navmap') {
-        this.scene = scene;
+    constructor(scene, player, navmeshData = null) {
+        this.scene  = scene;
         this.player = player;
 
-        this.navMapKey = navMapKey;
-        this.walkableThreshold = 128;
-        this.gridSize = 32;
+        // World bounds come from navmesh scene metadata (or background image as fallback)
+        this.worldWidth  = navmeshData?.scene?.width  ?? this._bgWidth();
+        this.worldHeight = navmeshData?.scene?.height ?? this._bgHeight();
+        this.polygons    = navmeshData?.navMesh ?? [];
 
-        this.navGrid = null;
-        this.gridWidth = 0;
+        this.gridSize   = 32;
+        this.navGrid    = null;
+        this.gridWidth  = 0;
         this.gridHeight = 0;
 
         this.targetMarker = null;
-
-        // Use actual physics body size for padding
         this.agentPadding = this.getAgentPadding();
 
-        if (!this.scene.textures.exists(this.navMapKey)) {
-            console.warn(`NavigationSystem: Navigation map '${this.navMapKey}' not found. All areas walkable.`);
+        if (this.polygons.length > 0) {
+            this._buildGrid();
         } else {
-            this.buildNavigationGrid();
+            console.warn('NavigationSystem: No navmesh polygons — all areas walkable.');
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal helpers
+    // -----------------------------------------------------------------------
+
+    _bgWidth() {
+        try { return this.scene.textures.get('hub_background')?.getSourceImage()?.width ?? 1920; }
+        catch { return 1920; }
+    }
+
+    _bgHeight() {
+        try { return this.scene.textures.get('hub_background')?.getSourceImage()?.height ?? 1080; }
+        catch { return 1080; }
     }
 
     getAgentPadding() {
-        const s = this.player?.sprite;
-        const body = s?.body;
-        const halfW = body?.halfWidth ?? 16;
+        const body  = this.player?.sprite?.body;
+        const halfW = body?.halfWidth  ?? 16;
         const halfH = body?.halfHeight ?? 16;
-        const maxHalf = Math.max(halfW, halfH);
-        return Math.max(Math.min(maxHalf, 22), 12);
+        return Math.max(Math.min(Math.max(halfW, halfH), 22), 12);
     }
 
+    // -----------------------------------------------------------------------
+    // Grid construction — rasterise polygons via ray-casting
+    // -----------------------------------------------------------------------
+
+    _buildGrid() {
+        this.gridWidth  = Math.ceil(this.worldWidth  / this.gridSize);
+        this.gridHeight = Math.ceil(this.worldHeight / this.gridSize);
+
+        this.navGrid = [];
+        for (let gy = 0; gy < this.gridHeight; gy++) {
+            this.navGrid[gy] = [];
+            for (let gx = 0; gx < this.gridWidth; gx++) {
+                const wx = gx * this.gridSize + this.gridSize / 2;
+                const wy = gy * this.gridSize + this.gridSize / 2;
+                this.navGrid[gy][gx] = this._pointInAnyPolygon(wx, wy);
+            }
+        }
+        console.log(`NavigationSystem: grid ${this.gridWidth}×${this.gridHeight} from ${this.polygons.length} polygon(s)`);
+    }
+
+    /** Ray-casting point-in-polygon test. */
+    _pointInPolygon(x, y, poly) {
+        let inside = false;
+        const n = poly.length;
+        for (let i = 0, j = n - 1; i < n; j = i++) {
+            const xi = poly[i].x, yi = poly[i].y;
+            const xj = poly[j].x, yj = poly[j].y;
+            const cross = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (cross) inside = !inside;
+        }
+        return inside;
+    }
+
+    _pointInAnyPolygon(x, y) {
+        for (const poly of this.polygons) {
+            if (this._pointInPolygon(x, y, poly)) return true;
+        }
+        return false;
+    }
+
+    // -----------------------------------------------------------------------
+    // Public API — same contract as before
+    // -----------------------------------------------------------------------
+
     getNavBounds() {
-        if (!this.scene.textures.exists(this.navMapKey)) return null;
-        const source = this.scene.textures.get(this.navMapKey).getSourceImage();
-        return { width: source.width, height: source.height };
+        return { width: this.worldWidth, height: this.worldHeight };
     }
 
     clampToNavBounds(x, y, padding = null) {
-        const bounds = this.getNavBounds();
-        if (!bounds) return { x, y };
-
-        const pad = padding ?? this.agentPadding;
+        const pad  = padding ?? this.agentPadding;
         const minX = pad;
         const minY = pad;
-        const maxX = bounds.width - 1 - pad;
-        const maxY = bounds.height - 1 - pad;
-
+        const maxX = this.worldWidth  - 1 - pad;
+        const maxY = this.worldHeight - 1 - pad;
         return {
             x: Math.max(minX, Math.min(maxX, Math.floor(x))),
-            y: Math.max(minY, Math.min(maxY, Math.floor(y)))
+            y: Math.max(minY, Math.min(maxY, Math.floor(y))),
         };
     }
 
-    buildNavigationGrid() {
-        const bounds = this.getNavBounds();
-        if (!bounds) {
-            console.warn('NavigationSystem: Cannot build grid - no navmap bounds');
-            return;
-        }
-
-        this.gridWidth = Math.ceil(bounds.width / this.gridSize);
-        this.gridHeight = Math.ceil(bounds.height / this.gridSize);
-
-        this.navGrid = [];
-        for (let y = 0; y < this.gridHeight; y++) {
-            this.navGrid[y] = [];
-            for (let x = 0; x < this.gridWidth; x++) {
-                const worldX = x * this.gridSize + this.gridSize / 2;
-                const worldY = y * this.gridSize + this.gridSize / 2;
-                this.navGrid[y][x] = this.isWalkable(worldX, worldY);
-            }
-        }
-
-        console.log(`NavigationSystem: Built ${this.gridWidth}x${this.gridHeight} grid (${this.gridSize}px cells)`);
-    }
-
     isWalkable(x, y) {
-        if (!this.scene.textures.exists(this.navMapKey)) {
-            return true;
+        if (!this.navGrid) {
+            // No grid built — fall back to direct point-in-polygon check
+            return this.polygons.length > 0
+                ? this._pointInAnyPolygon(x, y)
+                : true;
         }
-        
-        const texture = this.scene.textures.get(this.navMapKey);
-        const source = texture.getSourceImage();
-        
-        if (x < 0 || y < 0 || x >= source.width || y >= source.height) {
-            return false;
-        }
-        
-        const pixel = this.scene.textures.getPixel(Math.floor(x), Math.floor(y), this.navMapKey);
-        if (!pixel) {
-            return false;
-        }
-        
-        return pixel.r >= this.walkableThreshold;
+        const gx = Math.floor(x / this.gridSize);
+        const gy = Math.floor(y / this.gridSize);
+        return this.isGridWalkable(gx, gy);
     }
 
     moveTo(x, y) {
@@ -134,7 +166,7 @@ export default class NavigationSystem {
         if (!this.navGrid) {
             return [
                 this.clampToNavBounds(startX, startY),
-                this.clampToNavBounds(endX, endY)
+                this.clampToNavBounds(endX, endY),
             ];
         }
 
@@ -143,8 +175,8 @@ export default class NavigationSystem {
 
         const startGridX = Math.floor(s.x / this.gridSize);
         const startGridY = Math.floor(s.y / this.gridSize);
-        const endGridX = Math.floor(e.x / this.gridSize);
-        const endGridY = Math.floor(e.y / this.gridSize);
+        const endGridX   = Math.floor(e.x / this.gridSize);
+        const endGridY   = Math.floor(e.y / this.gridSize);
 
         if (!this.isGridWalkable(startGridX, startGridY) || !this.isGridWalkable(endGridX, endGridY)) {
             return null;
@@ -156,7 +188,7 @@ export default class NavigationSystem {
         const worldPath = gridPath.map(node => {
             const p = {
                 x: node.x * this.gridSize + this.gridSize / 2,
-                y: node.y * this.gridSize + this.gridSize / 2
+                y: node.y * this.gridSize + this.gridSize / 2,
             };
             return this.clampToNavBounds(p.x, p.y);
         });
@@ -165,182 +197,151 @@ export default class NavigationSystem {
     }
 
     enforcePlayerOnNavmesh() {
-        const p = this.player.getPosition();
+        const p       = this.player.getPosition();
         const clamped = this.clampToNavBounds(p.x, p.y);
 
-        // Check if out of bounds OR on non-walkable tile
-        const outOfBounds = (Math.abs(p.x - clamped.x) > 1 || Math.abs(p.y - clamped.y) > 1);
-        const onBadTile = !this.isWalkable(clamped.x, clamped.y);
+        const outOfBounds = Math.abs(p.x - clamped.x) > 1 || Math.abs(p.y - clamped.y) > 1;
+        const onBadTile   = !this.isWalkable(clamped.x, clamped.y);
 
         if (outOfBounds || onBadTile) {
             const safe = this.findNearestWalkablePoint(clamped.x, clamped.y, 500, 8);
             if (safe) {
                 console.warn(`Player stuck at (${p.x}, ${p.y}), teleporting to (${safe.x}, ${safe.y})`);
                 this.player.sprite.setPosition(safe.x, safe.y);
-                
-                // Reset velocity
-                if (this.player.sprite.body) {
-                    this.player.sprite.body.setVelocity(0, 0);
-                }
-                
-                // Stop path
+                if (this.player.sprite.body) this.player.sprite.body.setVelocity(0, 0);
                 this.player.stopMovement();
             }
         }
     }
 
+    // -----------------------------------------------------------------------
+    // A* pathfinding (unchanged)
+    // -----------------------------------------------------------------------
+
     findPathAStar(startX, startY, endX, endY) {
         const startNode = { x: startX, y: startY, g: 0, h: 0, f: 0, parent: null };
-        const endNode = { x: endX, y: endY };
-        
-        const openList = [startNode];
+        const endNode   = { x: endX, y: endY };
+
+        const openList   = [startNode];
         const closedList = [];
-        
+
         while (openList.length > 0) {
             let currentIndex = 0;
             for (let i = 1; i < openList.length; i++) {
-                if (openList[i].f < openList[currentIndex].f) {
-                    currentIndex = i;
-                }
+                if (openList[i].f < openList[currentIndex].f) currentIndex = i;
             }
-            
+
             const current = openList[currentIndex];
-            
+
             if (current.x === endNode.x && current.y === endNode.y) {
-                return this.reconstructPath(current);
+                return this._reconstructPath(current);
             }
-            
+
             openList.splice(currentIndex, 1);
             closedList.push(current);
-            
-            const neighbors = this.getGridNeighbors(current);
-            for (const neighbor of neighbors) {
-                if (closedList.find(n => n.x === neighbor.x && n.y === neighbor.y)) {
-                    continue;
-                }
-                
-                const g = current.g + this.gridDistance(current, neighbor);
-                const h = this.heuristic(neighbor, endNode);
+
+            for (const neighbor of this.getGridNeighbors(current)) {
+                if (closedList.find(n => n.x === neighbor.x && n.y === neighbor.y)) continue;
+
+                const g = current.g + this._gridDistance(current, neighbor);
+                const h = this._heuristic(neighbor, endNode);
                 const f = g + h;
-                
-                const existingNode = openList.find(n => n.x === neighbor.x && n.y === neighbor.y);
-                if (existingNode) {
-                    if (g < existingNode.g) {
-                        existingNode.g = g;
-                        existingNode.f = f;
-                        existingNode.parent = current;
-                    }
+
+                const existing = openList.find(n => n.x === neighbor.x && n.y === neighbor.y);
+                if (existing) {
+                    if (g < existing.g) { existing.g = g; existing.f = f; existing.parent = current; }
                 } else {
                     openList.push({ x: neighbor.x, y: neighbor.y, g, h, f, parent: current });
                 }
             }
         }
-        
         return null;
     }
-    
+
     getGridNeighbors(node) {
         const neighbors = [];
-        const directions = [
+        const dirs = [
             { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 },
-            { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: 1 }, { x: -1, y: -1 }
+            { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: 1 }, { x: -1, y: -1 },
         ];
-
-        for (const dir of directions) {
+        for (const dir of dirs) {
             const nx = node.x + dir.x;
             const ny = node.y + dir.y;
             if (!this.isGridWalkable(nx, ny)) continue;
 
             if (dir.x !== 0 && dir.y !== 0) {
-                const side1 = this.isGridWalkable(node.x + dir.x, node.y);
-                const side2 = this.isGridWalkable(node.x, node.y + dir.y);
-                if (!side1 || !side2) continue;
+                if (!this.isGridWalkable(node.x + dir.x, node.y)) continue;
+                if (!this.isGridWalkable(node.x, node.y + dir.y)) continue;
             }
-
             neighbors.push({ x: nx, y: ny });
         }
-
         return neighbors;
     }
-    
+
     isGridWalkable(x, y) {
-        if (x < 0 || y < 0 || x >= this.gridWidth || y >= this.gridHeight) {
-            return false;
-        }
+        if (x < 0 || y < 0 || x >= this.gridWidth || y >= this.gridHeight) return false;
         return this.navGrid[y][x];
     }
-    
-    gridDistance(a, b) {
+
+    _gridDistance(a, b) {
         const dx = Math.abs(a.x - b.x);
         const dy = Math.abs(a.y - b.y);
-        const D = 1;
-        const D2 = Math.SQRT2;
-        return D * (dx + dy) + (D2 - 2 * D) * Math.min(dx, dy);
+        return 1 * (dx + dy) + (Math.SQRT2 - 2) * Math.min(dx, dy);
     }
-    
-    heuristic(a, b) {
+
+    _heuristic(a, b) {
         const dx = Math.abs(a.x - b.x);
         const dy = Math.abs(a.y - b.y);
-        const D = 1;
-        const D2 = Math.SQRT2;
-        return D * (dx + dy) + (D2 - 2 * D) * Math.min(dx, dy);
+        return 1 * (dx + dy) + (Math.SQRT2 - 2) * Math.min(dx, dy);
     }
-    
-    reconstructPath(node) {
+
+    _reconstructPath(node) {
         const path = [];
-        let current = node;
-        while (current) {
-            path.unshift({ x: current.x, y: current.y });
-            current = current.parent;
-        }
+        let cur = node;
+        while (cur) { path.unshift({ x: cur.x, y: cur.y }); cur = cur.parent; }
         return path;
     }
-    
+
+    // -----------------------------------------------------------------------
+    // Path smoothing (unchanged)
+    // -----------------------------------------------------------------------
+
     smoothPath(path) {
-        if (!path || path.length <= 2) {
-            return path;
-        }
-        
+        if (!path || path.length <= 2) return path;
+
         const smoothed = [path[0]];
         let current = 0;
-        
+
         while (current < path.length - 1) {
             let farthest = current + 1;
-            
             for (let i = current + 2; i < path.length; i++) {
-                if (this.hasLineOfSight(path[current], path[i])) {
-                    farthest = i;
-                } else {
-                    break;
-                }
+                if (this.hasLineOfSight(path[current], path[i])) farthest = i;
+                else break;
             }
-            
             smoothed.push(path[farthest]);
             current = farthest;
         }
-        
         return smoothed;
     }
-    
+
     hasLineOfSight(from, to) {
         const dx = Math.abs(to.x - from.x);
         const dy = Math.abs(to.y - from.y);
         const steps = Math.max(dx, dy) / this.gridSize;
-
         if (steps === 0) return true;
 
         for (let i = 0; i <= steps; i++) {
             const t = i / steps;
             const x = Math.floor(from.x + (to.x - from.x) * t);
             const y = Math.floor(from.y + (to.y - from.y) * t);
-
-            if (!this.isWalkable(x, y)) {
-                return false;
-            }
+            if (!this.isWalkable(x, y)) return false;
         }
-
         return true;
     }
+
+    // -----------------------------------------------------------------------
+    // Nearest walkable search (unchanged)
+    // -----------------------------------------------------------------------
 
     findNearestWalkablePoint(x, y, maxRadius = 300, step = 8) {
         if (this.isWalkable(x, y)) return { x, y };
@@ -348,61 +349,39 @@ export default class NavigationSystem {
         for (let r = step; r <= maxRadius; r += step) {
             for (let angle = 0; angle < 360; angle += 15) {
                 const rad = (angle * Math.PI) / 180;
-                const px = Math.floor(x + Math.cos(rad) * r);
-                const py = Math.floor(y + Math.sin(rad) * r);
-
-                if (this.isWalkable(px, py)) {
-                    return { x: px, y: py };
-                }
+                const px  = Math.floor(x + Math.cos(rad) * r);
+                const py  = Math.floor(y + Math.sin(rad) * r);
+                if (this.isWalkable(px, py)) return { x: px, y: py };
             }
         }
-
         return null;
     }
+
+    // -----------------------------------------------------------------------
+    // Visual markers (unchanged)
+    // -----------------------------------------------------------------------
 
     showInvalidMarker(x, y) {
         const marker = this.scene.add.graphics();
         marker.lineStyle(3, 0xff0000, 0.8);
         marker.beginPath();
-        marker.moveTo(x - 10, y - 10);
-        marker.lineTo(x + 10, y + 10);
-        marker.moveTo(x + 10, y - 10);
-        marker.lineTo(x - 10, y + 10);
+        marker.moveTo(x - 10, y - 10); marker.lineTo(x + 10, y + 10);
+        marker.moveTo(x + 10, y - 10); marker.lineTo(x - 10, y + 10);
         marker.strokePath();
-        
-        this.scene.tweens.add({
-            targets: marker,
-            alpha: 0,
-            duration: 500,
-            onComplete: () => {
-                marker.destroy();
-            }
-        });
+        this.scene.tweens.add({ targets: marker, alpha: 0, duration: 500,
+            onComplete: () => marker.destroy() });
     }
 
     showTargetMarker(x, y) {
-        if (this.targetMarker) {
-            this.targetMarker.destroy();
-        }
-        
+        if (this.targetMarker) this.targetMarker.destroy();
         this.targetMarker = this.scene.add.circle(x, y, 8, 0xffff00, 0.6);
-        
         this.scene.tweens.add({
-            targets: this.targetMarker,
-            alpha: 0,
-            duration: 500,
-            onComplete: () => {
-                if (this.targetMarker) {
-                    this.targetMarker.destroy();
-                    this.targetMarker = null;
-                }
-            }
+            targets: this.targetMarker, alpha: 0, duration: 500,
+            onComplete: () => { this.targetMarker?.destroy(); this.targetMarker = null; },
         });
     }
 
     destroy() {
-        if (this.targetMarker) {
-            this.targetMarker.destroy();
-        }
+        if (this.targetMarker) this.targetMarker.destroy();
     }
 }

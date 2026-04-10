@@ -5,6 +5,7 @@
 import { useRef, useState, useEffect } from 'react';
 import * as charactersApi from '../api/charactersApi.js';
 import * as itemsApi      from '../api/itemsApi.js';
+import * as sceneApi      from '../api/sceneApi.js';
 import '../styles/scene-editor.css';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -184,6 +185,17 @@ export default function SceneEditorPage() {
     useEffect(() => {
         if (!polygons.length && !markers.length && !sceneName) return;
         localStorage.setItem(SAVE_KEY, JSON.stringify({ sceneName, sceneDesc, canvasSize, polygons, markers }));
+
+        // Also persist to DB when connected to real API
+        if (import.meta.env.VITE_USE_API && sceneName) {
+            const key = sceneName.toLowerCase().replace(/\s+/g, '_');
+            const exportData = {
+                scene:   { name: sceneName, description: sceneDesc, width: canvasSize.w, height: canvasSize.h },
+                navMesh: polygons.map(poly => poly.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))),
+                markers: markers.map(m => ({ id: m.id, type: m.type, x: m.x, y: m.y, targetId: m.targetId ?? null, label: m.label })),
+            };
+            sceneApi.upsertScene(key, sceneName, exportData).catch(console.error);
+        }
     }, [sceneName, sceneDesc, canvasSize, polygons, markers]);
 
     // Redraw
