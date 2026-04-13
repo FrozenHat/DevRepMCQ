@@ -81,6 +81,15 @@
 .se-btn--primary:hover {
     filter: brightness(1.12);
 }
+.se-btn--saved {
+    background:   #166534;
+    border-color: #22c55e;
+    color:        #86efac;
+}
+.se-btn:disabled {
+    opacity: 0.5;
+    cursor:  not-allowed;
+}
 
 /* ── Main layout ─────────────────────────────────────────── */
 .se-layout {
@@ -405,3 +414,83 @@
     transition:    border-color var(--transition);
 }
 .se-marker-label-input:focus { outline: none; border-color: var(--color-accent); }
+
+/* ── Scene list (API mode) ────────────────────────────────────── */
+.se-scene-list-wrap {
+    flex:       1;
+    overflow-y: auto;
+    padding:    24px;
+}
+
+.se-scene-empty {
+    display:         flex;
+    flex-direction:  column;
+    align-items:     center;
+    justify-content: center;
+    gap:             16px;
+    height:          100%;
+    min-height:      300px;
+    color:           var(--color-text-muted);
+    font-size:       14px;
+}
+
+.se-scene-grid {
+    display:               grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap:                   16px;
+}
+
+.se-scene-card {
+    display:        flex;
+    flex-direction: column;
+    gap:            6px;
+    padding:        14px 16px;
+    background:     var(--color-surface);
+    border:         1px solid var(--color-border);
+    border-radius:  var(--radius-md);
+    cursor:         pointer;
+    transition:     border-color var(--transition), background var(--transition);
+}
+.se-scene-card:hover {
+    border-color: var(--color-accent);
+    background:   color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+
+.se-scene-card__header {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+}
+
+.se-scene-card__icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.se-scene-card__name {
+    font-size:   13px;
+    font-weight: 600;
+    color:       var(--color-text);
+    overflow:    hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.se-scene-card__key {
+    font-size:   10px;
+    font-family: var(--font-mono);
+    color:       var(--color-text-muted);
+}
+
+.se-scene-card__stats {
+    display:  flex;
+    gap:      10px;
+    font-size: 11px;
+    color:    var(--color-text-muted);
+}
+
+.se-scene-card__date {
+    font-size: 10px;
+    color:     var(--color-text-muted);
+    margin-top: 2px;
+}

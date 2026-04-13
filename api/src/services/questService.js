@@ -108,7 +108,7 @@ export async function createQuest(userId, title, slug) {
  */
 export async function getQuestVersions(questId) {
     const result = await db.query(
-        `SELECT id, version_number, status, published_at, created_at
+        `SELECT id, version_number, status, data, published_at, created_at
          FROM quest_versions
          WHERE quest_id = $1
          ORDER BY version_number DESC`,

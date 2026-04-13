@@ -1,6 +1,7 @@
 /**
  * SceneEditorPage.jsx
  * Full scene authoring tool: NavMesh, NPC/Item placement, Hotspots.
+ * Supports list/edit views when VITE_USE_API=true.
  */
 import { useRef, useState, useEffect } from 'react';
 import * as charactersApi from '../api/charactersApi.js';
@@ -18,6 +19,8 @@ const ITEM_HW       = 11;
 const SAVE_KEY      = 'mcq_dev_scene';
 
 const TOOL_LABELS = { navmesh: 'NavMesh', npc: 'NPC', item: 'Предмет', hotspot: 'Хотспот' };
+
+const USE_API = import.meta.env.VITE_USE_API === 'true' || import.meta.env.VITE_USE_API === true;
 
 // ─── Canvas marker drawers ────────────────────────────────────────────────────
 
@@ -144,12 +147,21 @@ function renderCanvas(canvas, bgImg, polygons, current, mouse, markers, tool, ch
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SceneEditorPage() {
-    const canvasRef    = useRef(null);
-    const bgImgRef     = useRef(null);
-    const fileInputRef = useRef(null);
+    const canvasRef        = useRef(null);
+    const bgImgRef         = useRef(null);
+    const bgFileRef        = useRef(null);   // pending File for upload
+    const fileInputRef     = useRef(null);
+    const initialLoadDone  = useRef(false);
 
+    // View: 'list' shows scene picker, 'edit' shows canvas editor
+    const [view,           setView]           = useState(USE_API ? 'list' : 'edit');
+    const [scenes,         setScenes]         = useState([]);
+    const [scenesLoading,  setScenesLoading]  = useState(USE_API);
+
+    // Editor state
     const [sceneName,      setSceneName]      = useState('');
     const [sceneDesc,      setSceneDesc]      = useState('');
+    const [bgUrl,          setBgUrl]          = useState('');  // persisted image URL
     const [bgLoaded,       setBgLoaded]       = useState(false);
     const [canvasSize,     setCanvasSize]     = useState({ w: 900, h: 550 });
     const [polygons,       setPolygons]       = useState([]);
@@ -161,41 +173,43 @@ export default function SceneEditorPage() {
     const [items,          setItems]          = useState([]);
     const [selectedTarget, setSelectedTarget] = useState(null);
     const [copied,         setCopied]         = useState(false);
+    const [saveStatus,     setSaveStatus]     = useState('idle'); // 'idle'|'saving'|'saved'|'error'
 
     const charMap = Object.fromEntries(characters.map(c => [c.id, c]));
     const itemMap = Object.fromEntries(items.map(i => [i.id, i]));
 
-    // Load
+    // ── Load ──────────────────────────────────────────────────────────────────
+
     useEffect(() => {
+        // Load characters and items regardless of mode
         charactersApi.listCharacters().then(setCharacters).catch(() => {});
         itemsApi.listItems().then(setItems).catch(() => {});
-        try {
-            const d = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null');
-            if (d) {
-                if (d.sceneName)  setSceneName(d.sceneName);
-                if (d.sceneDesc)  setSceneDesc(d.sceneDesc);
-                if (d.canvasSize) setCanvasSize(d.canvasSize);
-                if (d.polygons)   setPolygons(d.polygons);
-                if (d.markers)    setMarkers(d.markers);
-            }
-        } catch (_) {}
+
+        if (USE_API) {
+            // API mode: load scene list, stay in list view
+            loadScenesList();
+        } else {
+            // Local mode: load from localStorage, go straight to editor
+            try {
+                const d = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null');
+                if (d) {
+                    if (d.sceneName)  setSceneName(d.sceneName);
+                    if (d.sceneDesc)  setSceneDesc(d.sceneDesc);
+                    if (d.canvasSize) setCanvasSize(d.canvasSize);
+                    if (d.polygons)   setPolygons(d.polygons);
+                    if (d.markers)    setMarkers(d.markers);
+                }
+            } catch (_) {}
+            initialLoadDone.current = true;
+        }
     }, []);
 
-    // Auto-save
+    // Auto-save to localStorage (local mode only)
     useEffect(() => {
+        if (USE_API) return;
+        if (!initialLoadDone.current) return;
         if (!polygons.length && !markers.length && !sceneName) return;
         localStorage.setItem(SAVE_KEY, JSON.stringify({ sceneName, sceneDesc, canvasSize, polygons, markers }));
-
-        // Also persist to DB when connected to real API
-        if (import.meta.env.VITE_USE_API && sceneName) {
-            const key = sceneName.toLowerCase().replace(/\s+/g, '_');
-            const exportData = {
-                scene:   { name: sceneName, description: sceneDesc, width: canvasSize.w, height: canvasSize.h },
-                navMesh: polygons.map(poly => poly.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))),
-                markers: markers.map(m => ({ id: m.id, type: m.type, x: m.x, y: m.y, targetId: m.targetId ?? null, label: m.label })),
-            };
-            sceneApi.upsertScene(key, sceneName, exportData).catch(console.error);
-        }
     }, [sceneName, sceneDesc, canvasSize, polygons, markers]);
 
     // Redraw
@@ -205,7 +219,79 @@ export default function SceneEditorPage() {
         renderCanvas(canvas, bgImgRef.current, polygons, current, mouse, markers, tool, charMap, itemMap);
     }, [bgLoaded, canvasSize, polygons, current, mouse, markers, tool, characters, items]);
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Scene list helpers ────────────────────────────────────────────────────
+
+    async function loadScenesList() {
+        setScenesLoading(true);
+        try {
+            const list = await sceneApi.listScenes();
+            setScenes(list ?? []);
+        } catch (err) {
+            console.error('Failed to load scenes:', err);
+            setScenes([]);
+        } finally {
+            setScenesLoading(false);
+        }
+    }
+
+    async function openScene(scene) {
+        // scene: { key, title, data, updated_at }
+        initialLoadDone.current = false;
+        bgImgRef.current  = null;
+        bgFileRef.current = null;
+        setBgLoaded(false);
+        setSceneName(scene.title ?? scene.key ?? '');
+        setSceneDesc(scene.data?.scene?.description ?? '');
+        setCanvasSize(
+            scene.data?.scene?.width && scene.data?.scene?.height
+                ? { w: scene.data.scene.width, h: scene.data.scene.height }
+                : { w: 900, h: 550 }
+        );
+        setPolygons(scene.data?.navMesh ?? []);
+        setMarkers(scene.data?.markers ?? []);
+        setCurrent([]);
+        setTool('navmesh');
+        setSelectedTarget(null);
+        setSaveStatus('idle');
+
+        // Load background image from stored URL
+        const storedBgUrl = scene.data?.scene?.bgUrl ?? '';
+        setBgUrl(storedBgUrl);
+        if (storedBgUrl) {
+            const img = new Image();
+            img.onload = () => { bgImgRef.current = img; setBgLoaded(v => !v); };
+            img.src = storedBgUrl;
+        }
+
+        setView('edit');
+        initialLoadDone.current = true;
+    }
+
+    function newScene() {
+        initialLoadDone.current = false;
+        bgImgRef.current  = null;
+        bgFileRef.current = null;
+        setBgLoaded(false);
+        setBgUrl('');
+        setSceneName('');
+        setSceneDesc('');
+        setCanvasSize({ w: 900, h: 550 });
+        setPolygons([]);
+        setMarkers([]);
+        setCurrent([]);
+        setTool('navmesh');
+        setSelectedTarget(null);
+        setSaveStatus('idle');
+        setView('edit');
+        initialLoadDone.current = true;
+    }
+
+    async function backToList() {
+        setView('list');
+        await loadScenesList();
+    }
+
+    // ── Canvas helpers ────────────────────────────────────────────────────────
 
     function toCanvasPos(e) {
         const canvas = canvasRef.current;
@@ -263,6 +349,7 @@ export default function SceneEditorPage() {
     function onImageChange(e) {
         const file = e.target.files[0];
         if (!file) return;
+        bgFileRef.current = file;   // remember for upload on save
         const img = new Image();
         img.onload = () => { bgImgRef.current = img; setCanvasSize({ w: img.naturalWidth, h: img.naturalHeight }); setBgLoaded(v => !v); };
         img.src = URL.createObjectURL(file);
@@ -275,9 +362,10 @@ export default function SceneEditorPage() {
     function deletePolygon(idx)           { setPolygons(prev => prev.filter((_, i) => i !== idx)); }
     function clearAll()                   { setPolygons([]); setCurrent([]); setMarkers([]); }
 
-    function buildExport() {
+    function buildExport(resolvedBgUrl) {
+        const url = resolvedBgUrl ?? bgUrl;
         return {
-            scene:   { name: sceneName, description: sceneDesc, width: canvasSize.w, height: canvasSize.h },
+            scene:   { name: sceneName, description: sceneDesc, width: canvasSize.w, height: canvasSize.h, bgUrl: url || undefined },
             navMesh: polygons.map(poly => poly.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))),
             markers: markers.map(m => ({ id: m.id, type: m.type, x: m.x, y: m.y, targetId: m.targetId ?? null, label: m.label })),
         };
@@ -294,6 +382,31 @@ export default function SceneEditorPage() {
         setCopied(true); setTimeout(() => setCopied(false), 1800);
     }
 
+    async function saveToDb() {
+        if (!sceneName) return;
+        setSaveStatus('saving');
+        try {
+            const key = sceneName.toLowerCase().replace(/\s+/g, '_');
+
+            // Upload image if a new file was selected
+            let resolvedBgUrl = bgUrl;
+            if (bgFileRef.current) {
+                const { url } = await sceneApi.uploadSceneImage(key, bgFileRef.current);
+                resolvedBgUrl = url;
+                setBgUrl(url);
+                bgFileRef.current = null;
+            }
+
+            await sceneApi.upsertScene(key, sceneName, buildExport(resolvedBgUrl));
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus('idle'), 2500);
+        } catch (err) {
+            console.error('Save to DB failed:', err);
+            setSaveStatus('error');
+            setTimeout(() => setSaveStatus('idle'), 3000);
+        }
+    }
+
     const hasContent = polygons.length > 0 || markers.length > 0;
 
     const HINTS = {
@@ -304,20 +417,88 @@ export default function SceneEditorPage() {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Render: Scene List
+    // ─────────────────────────────────────────────────────────────────────────
+
+    if (view === 'list') {
+        return (
+            <div className="se-page">
+                <div className="se-toolbar">
+                    <span className="se-toolbar__title">Scene Editor</span>
+                    <div className="se-toolbar__actions">
+                        <button className="se-btn se-btn--primary" onClick={newScene}>+ Новая сцена</button>
+                    </div>
+                </div>
+
+                <div className="se-scene-list-wrap">
+                    {scenesLoading ? (
+                        <p className="se-empty">Загрузка сцен…</p>
+                    ) : scenes.length === 0 ? (
+                        <div className="se-scene-empty">
+                            <p>Нет сохранённых сцен.</p>
+                            <button className="se-btn se-btn--primary" onClick={newScene}>Создать первую сцену</button>
+                        </div>
+                    ) : (
+                        <div className="se-scene-grid">
+                            {scenes.map(s => {
+                                const polyCount   = s.data?.navMesh?.length ?? 0;
+                                const markerCount = s.data?.markers?.length ?? 0;
+                                const updated     = s.updated_at ? new Date(s.updated_at).toLocaleDateString('ru-RU') : '—';
+                                return (
+                                    <div key={s.key} className="se-scene-card" onClick={() => openScene(s)}>
+                                        <div className="se-scene-card__header">
+                                            <span className="se-scene-card__icon">🗺</span>
+                                            <span className="se-scene-card__name">{s.title ?? s.key}</span>
+                                        </div>
+                                        <div className="se-scene-card__key">{s.key}</div>
+                                        <div className="se-scene-card__stats">
+                                            <span>{polyCount} полигонов</span>
+                                            <span>{markerCount} маркеров</span>
+                                        </div>
+                                        <div className="se-scene-card__date">Изменено: {updated}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Render: Scene Editor
+    // ─────────────────────────────────────────────────────────────────────────
 
     return (
         <div className="se-page">
             {/* Toolbar */}
             <div className="se-toolbar">
-                <span className="se-toolbar__title">Scene Editor</span>
+                {USE_API && (
+                    <button className="se-btn se-btn--ghost" onClick={backToList}>← Сцены</button>
+                )}
+                <span className="se-toolbar__title">
+                    {sceneName ? sceneName : 'Новая сцена'}
+                </span>
                 <div className="se-toolbar__actions">
                     <button className="se-btn se-btn--secondary" onClick={() => fileInputRef.current.click()}>Загрузить фон</button>
                     <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onImageChange} />
                     {hasContent && <>
                         <button className="se-btn se-btn--ghost" onClick={clearAll}>Очистить всё</button>
                         <button className="se-btn se-btn--ghost" onClick={copyJson}>{copied ? '✓ Скопировано' : 'Копировать JSON'}</button>
-                        <button className="se-btn se-btn--primary" onClick={exportJson}>Скачать JSON</button>
+                        <button className="se-btn se-btn--ghost" onClick={exportJson}>Скачать JSON</button>
                     </>}
+                    {USE_API && (
+                        <button
+                            className={`se-btn ${saveStatus === 'saved' ? 'se-btn--saved' : 'se-btn--primary'}`}
+                            onClick={saveToDb}
+                            disabled={saveStatus === 'saving' || !sceneName}
+                        >
+                            {saveStatus === 'saving' ? 'Сохранение…'  :
+                             saveStatus === 'saved'  ? '✓ Сохранено'  :
+                             saveStatus === 'error'  ? '⚠ Ошибка'     : 'Сохранить в БД'}
+                        </button>
+                    )}
                 </div>
             </div>
 

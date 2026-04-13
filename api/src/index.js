@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 
 import { config }          from './config.js';
 import { db }              from './db/index.js';
@@ -26,6 +27,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve uploaded scene images
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // ---------------------------------------------------------------------------
 // Routes

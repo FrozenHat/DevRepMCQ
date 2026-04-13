@@ -8,8 +8,10 @@ export default defineConfig({
     host: true,   // allow Docker/LAN access
     proxy: {
       '/api': {
-        // In Docker use VITE_API_TARGET=http://api:3000
-        // Locally defaults to http://localhost:3000
+        target:       process.env.VITE_API_TARGET ?? 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
         target:       process.env.VITE_API_TARGET ?? 'http://localhost:3000',
         changeOrigin: true,
       },

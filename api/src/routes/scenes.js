@@ -2,6 +2,31 @@ import { Router }      from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { db }          from '../db/index.js';
+import multer          from 'multer';
+import path            from 'path';
+import { mkdirSync }   from 'fs';
+
+// ─── Multer setup ─────────────────────────────────────────────────────────────
+
+const uploadDir = path.join(process.cwd(), 'uploads', 'scenes');
+mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename:    (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+        cb(null, `${req.params.key}_${Date.now()}${ext}`);
+    },
+});
+
+const upload = multer({
+    storage,
+    limits:      { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter:  (_req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('Only image files are allowed'));
+    },
+});
 
 const router = Router();
 
@@ -13,7 +38,7 @@ const router = Router();
 router.get('/', authenticate, requireRole('admin'), async (req, res, next) => {
     try {
         const { rows } = await db.query(
-            'SELECT id, key, title, data, created_at FROM scenes ORDER BY title ASC'
+            'SELECT id, key, title, data, created_at, updated_at FROM scenes ORDER BY title ASC'
         );
         res.json(rows);
     } catch (err) { next(err); }
@@ -42,6 +67,19 @@ router.put('/:key', authenticate, requireRole('admin'), async (req, res, next) =
             [req.params.key, title, data]
         );
         res.json(rows[0]);
+    } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/scenes/:key/image
+// Upload a background image for a scene. Returns { url }.
+// ---------------------------------------------------------------------------
+
+router.post('/:key/image', authenticate, requireRole('admin'), upload.single('image'), (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No image file provided' });
+        const url = `/uploads/scenes/${req.file.filename}`;
+        res.json({ url });
     } catch (err) { next(err); }
 });
 

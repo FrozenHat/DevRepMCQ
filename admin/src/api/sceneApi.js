@@ -30,6 +30,28 @@ export async function upsertScene(key, title, data) {
     }));
 }
 
+export async function getScene(key) {
+    const res = await fetch(`/api/scenes/${key}`, { headers: headers() });
+    if (res.status === 404) return null;
+    return handleResponse(res);
+}
+
 export async function listScenes() {
     return handleResponse(await fetch('/api/scenes', { headers: headers() }));
+}
+
+/**
+ * Upload a background image for a scene.
+ * Returns { url } — a path like /uploads/scenes/key_timestamp.jpg
+ */
+export async function uploadSceneImage(key, file) {
+    const token = useAuthStore.getState().token;
+    const form  = new FormData();
+    form.append('image', file);
+    const res = await fetch(`/api/scenes/${key}/image`, {
+        method:  'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body:    form,
+    });
+    return handleResponse(res);
 }
